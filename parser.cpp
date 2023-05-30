@@ -29,22 +29,6 @@ bool canReadBytes(std::ifstream& file, std::streampos currentPos, std::streamsiz
 	file.seekg(currentPos);
 	return false;
 }
-//Converter method from an 8 byte char array to a size_t
-size_t convertToNumber64(char chars[8]) {
-	size_t number = 0;
-	for (int i = 0; i < 8; i++) {
-		number = (number << 8) | static_cast<uint8_t>(chars[7 - i]);
-	}
-	return number;
-}
-//Converter method from a 2 byte char array to a uint16_t
-uint16_t convertToNumber16(char chars[2]) {
-	uint16_t number = 0;
-	for (int i = 0; i < 2; i++) {
-		number = (number << 8) | static_cast<uint8_t>(chars[1 - i]);
-	}
-	return number;
-}
 
 //Gets the file stream 
 std::optional<CAFFBlockHeader> readCAFFBlockHeader(std::ifstream& file) {
@@ -59,26 +43,22 @@ std::optional<CAFFBlockHeader> readCAFFBlockHeader(std::ifstream& file) {
 		return std::nullopt;
 	}
 	//Block ID byte
-	char id;
+	unsigned char id = 0;
 	//Block length integer
-	char length[8];
+	size_t length = 0;
 
 	//Read the ID and length fields
-	if (!file.get(id)) {
+	if (!file.read(reinterpret_cast<char*>(&id), sizeof(id))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return std::nullopt;
 	}
-	if (!file.read(length, sizeof(length))) {
+	if (!file.read(reinterpret_cast<char*>(&length), sizeof(length))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return std::nullopt;
 	}
-
-	//Convert the char bytes to integer types
-	uint8_t iid = static_cast<uint8_t>(id);
-	size_t ilength = convertToNumber64(length);
 
 	//Make the block header struct
-	CAFFBlockHeader header = { iid, ilength };
+	CAFFBlockHeader header = { id, length };
 
 	//Check if it's a header block and the length is correctly 20 bytes (magic(4) + header_size(8) + num_anim(8))
 	if (header.id == CAFFBlockType::header && header.length == 20) {
@@ -112,40 +92,36 @@ bool readCAFFHeaderBlock(std::ifstream& file) {
 	//Header magic characters
 	char magic[4];
 	//Header size integer
-	char header_size[8];
+	size_t header_size = 0;
 	//Number of animation blocks integer
-	char num_anim[8];
+	size_t num_anim = 0;
 
 	//Read the header fields
 	if (!file.read(magic, sizeof(magic))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.read(header_size, sizeof(header_size))) {
+	if (!file.read(reinterpret_cast<char*>(&header_size), sizeof(header_size))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.read(num_anim, sizeof(num_anim))) {
+	if (!file.read(reinterpret_cast<char*>(&num_anim), sizeof(num_anim))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	//Convert char bytes
-	size_t iheader_size = convertToNumber64(header_size);
-	size_t inum_anim = convertToNumber64(num_anim);
-	std::string smagic(magic, sizeof(magic));
 
 	//Check if the magic characters are "CAFF"
-	if (smagic != "CAFF") {
-		std::cerr << "Magic is not CAFF" << std::endl << "Magic: " << smagic << std::endl;
+	if (std::string(magic, sizeof(magic)) != "CAFF") {
+		std::cerr << "Magic is not CAFF" << std::endl << "Magic: " << magic << std::endl;
 		return false;
 	}
 	//Check if the header size is equal to 20 (magic(4) + header_size(8) + num_anim(8))
-	if (iheader_size != 20) {
-		std::cerr << "Header size is not correct" << std::endl << "Header size: " << iheader_size << std::endl;
+	if (header_size != 20) {
+		std::cerr << "Header size is not correct" << std::endl << "Header size: " << header_size << std::endl;
 		return false;
 	}
 	//Check if there are CIFFs to parse
-	if (inum_anim < 1) {
+	if (num_anim < 1) {
 		std::cerr << "No CIFF image to convert!" << std::endl;
 		return false;
 	}
@@ -165,94 +141,86 @@ bool readCAFFCreditsBlock(std::ifstream& file, size_t credits_length) {
 		return false;
 	}
 	//Creation date 
-	char year[2];
-	char month;
-	char day;
-	char hour;
-	char minute;
+	uint16_t year = 0;
+	uint8_t month = 0;
+	uint8_t day = 0;
+	uint8_t hour = 0;
+	uint8_t minute = 0;
 	//Creator length integer
-	char creator_length[8];
+	size_t creator_length = 0;
 
 	//Read date and creator length
-	if (!file.read(year, sizeof(year))) {
+	if (!file.read(reinterpret_cast<char*>(&year), sizeof(year))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.get(month)) {
+	if (!file.read(reinterpret_cast<char*>(&month), sizeof(month))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.get(day)) {
+	if (!file.read(reinterpret_cast<char*>(&day), sizeof(day))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.get(hour)) {
+	if (!file.read(reinterpret_cast<char*>(&hour), sizeof(hour))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.get(minute)) {
+	if (!file.read(reinterpret_cast<char*>(&minute), sizeof(minute))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.read(creator_length, sizeof(creator_length))) {
+	if (!file.read(reinterpret_cast<char*>(&creator_length), sizeof(creator_length))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-
-	//Convert the date and length fields to integers
-	uint16_t iyear = convertToNumber16(year);
-	int imonth = static_cast<int>(month);
-	int iday = static_cast<int>(day);
-	int ihour = static_cast<int>(hour);
-	int iminute = static_cast<int>(minute);
-	size_t icreator_length = convertToNumber64(creator_length);
 
 	//Check if the date format is correct
-	if (iyear < 0 || iyear > 9999) {
-		std::cerr << "Year is not correct!" << std::endl << "Year: " << iyear << std::endl;
+	if (year > 9999) {
+		std::cerr << "Year is not correct!" << std::endl << "Year: " << year << std::endl;
 		return false;
 	}
-	if (imonth < 1 || imonth > 12) {
-		std::cerr << "Month is not correct!" << std::endl << "Month: " << imonth << std::endl;
+	if (month < 1 || month > 12) {
+		std::cerr << "Month is not correct!" << std::endl << "Month: " << month << std::endl;
 		return false;
 	}
-	if (iday < 1 || iday > 31) {
-		std::cerr << "Day is not correct!" << std::endl << "Day: " << iday << std::endl;
+	if (day < 1 || day > 31) {
+		std::cerr << "Day is not correct!" << std::endl << "Day: " << day << std::endl;
 		return false;
 	}
-	if (ihour < 0 || ihour > 24) {
-		std::cerr << "Hour is not correct!" << std::endl << "Hour: " << ihour << std::endl;
+	if (hour > 24) {
+		std::cerr << "Hour is not correct!" << std::endl << "Hour: " << hour << std::endl;
 		return false;
 	}
-	if (iminute < 0 || iminute > 60) {
-		std::cerr << "Minute is not correct!" << std::endl << "Minute: " << iminute << std::endl;
+	if (minute > 60) {
+		std::cerr << "Minute is not correct!" << std::endl << "Minute: " << minute << std::endl;
 		return false;
 	}
 	//Check if the creator matches up with the CAFF block length
-	if (icreator_length != credits_length - 14) {
-		std::cerr << "Creator length mismatch!" << std::endl << "Creator length is: " << icreator_length << " when it should be: " << credits_length -14 << std::endl;
+	if (creator_length != credits_length - 14) {
+		std::cerr << "Creator length mismatch!" << std::endl << "Creator length is: " << creator_length << " when it should be: " << credits_length - 14 << std::endl;
 		return false;
 	}
 	//If there is no creator return and parsing can continue
-	if (icreator_length != 0) {
+	if (creator_length != 0) {
 		//Create char array for the creator string
-		char* creator = new char[icreator_length];
+		char* creator = new char[creator_length];
 
 		//Read in the creator string
-		if (!file.read(creator, std::streamsize(icreator_length))) {
+		if (!file.read(creator, std::streamsize(creator_length))) {
 			std::cerr << "Failed to read file!" << std::endl;
 			delete[] creator;
 			return false;
 		}
 		//Convert to string
-		std::string screator(creator, icreator_length);
+		std::string screator(creator, creator_length);
 		delete[] creator;
 
 		//Print the creator
 		std::cout << "CAFF Creator: " << screator << std::endl;
 	}
 	//Print creation time
-	std::cout << "Creation date: " << iyear << "." << imonth << "." << iday << ". " << ihour << ":" << iminute << std::endl;
+	std::cout << "Creation date: " << year << "." << static_cast<int>(month) << "." << static_cast<int>(day) << ". " << static_cast<int>(hour) << ":" << static_cast<int>(minute) << std::endl;
 	return true;
 }
 
@@ -271,69 +239,62 @@ bool readCIFFFile(std::ifstream& file, std::string fileName) {
 	//CIFF magic characters
 	char magic[4];
 	//CIFF header size
-	char header_size[8];
+	size_t header_size = 0;
 	//CIFF content size
-	char content_size[8];
+	size_t content_size = 0;
 	//CIFF image width
-	char width[8];
+	size_t width = 0;
 	//CIFF image height
-	char height[8];
+	size_t height = 0;
 
 	//Read in the header fields
 	if (!file.read(magic, sizeof(magic))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.read(header_size, sizeof(header_size))) {
+	if (!file.read(reinterpret_cast<char*>(&header_size), sizeof(header_size))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.read(content_size, sizeof(content_size))) {
+	if (!file.read(reinterpret_cast<char*>(&content_size), sizeof(content_size))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.read(width, sizeof(width))) {
+	if (!file.read(reinterpret_cast<char*>(&width), sizeof(width))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	if (!file.read(height, sizeof(height))) {
+	if (!file.read(reinterpret_cast<char*>(&height), sizeof(height))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-
-	//Convert the fields to numbers and string
-	std::string smagic(magic, sizeof(magic));
-	size_t iheader_size = convertToNumber64(header_size);
-	size_t icontent_size = convertToNumber64(content_size);
-	size_t iwidth = convertToNumber64(width);
-	size_t iheight = convertToNumber64(height);
 
 	//Check if magic characters are CIFF
-	if (smagic != "CIFF") {
-		std::cerr << "Magic is not CIFF" << std::endl << "Magic: " << smagic << std::endl;
+	if (std::string(magic, sizeof(magic)) != "CIFF") {
+		std::cerr << "Magic is not CIFF" << std::endl << "Magic: " << magic << std::endl;
 		return false;
 	}
 
 	//Check if the header size is at least 36 characters
-	if (iheader_size <= 36) {
-		std::cerr << "Header size is incorrect" << std::endl << "Header size: " << iheader_size << std::endl;
+	if (header_size <= 36) {
+		std::cerr << "Header size is incorrect" << std::endl << "Header size: " << header_size << std::endl;
 		return false;
 	}
 
 	//Check if the Content size is width * height * 3
-	if (icontent_size != iwidth * iheight * 3) {
-		std::cerr << "Content size is incorrect!" << "Content size: " << icontent_size << " != " << iwidth << " * " << iheight << " * " << "3" << std::endl;
+	if (content_size != width * height * 3) {
+		std::cerr << "Content size is incorrect!" << "Content size: " << content_size << " != " << width << " * " << height << " * " << "3" << std::endl;
 		return false;
 	}
 
 	//Check if there are pixels to convert
-	if (icontent_size == 0) {
+	if (content_size == 0) {
 		std::cerr << "No pixels to make JPEG!" << std::endl;
 		return false;
 	}
-	
+
 	//Calculate the remaining size of the header
-	size_t remaining_header_size = iheader_size - 36;
+	size_t remaining_header_size = header_size - 36;
 
 	//Check if the caption and tags have at least the ending characters
 	if (remaining_header_size < 2) {
@@ -399,22 +360,23 @@ bool readCIFFFile(std::ifstream& file, std::string fileName) {
 
 	//Make the JPEG file from the content of the CIFF
 	//Check if the file has enough space for the files
-	if (!canReadBytes(file, file.tellg(), icontent_size)) {
+	if (!canReadBytes(file, file.tellg(), content_size)) {
 		std::cerr << "Not enough bytes left in file!" << std::endl;
 		return false;
 	}
 
 	//Make the buffer for the JPEG content
-	char* buffer = new char[icontent_size];
-	if (!file.read(buffer, icontent_size)) {
+	char* buffer = new char[content_size];
+	if (!file.read(buffer, content_size)) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
+
 	//Make the file name
 	std::string name = fileName + ".jpg";
 
 	//Make the file.
-	int result = stbi_write_jpg(name.c_str(), (int)iwidth, (int)iheight, 3, buffer, 50);
+	int result = stbi_write_jpg(name.c_str(), (int)width, (int)height, 3, buffer, 50);
 
 	//If the result is 0 it was not successful
 	if (result == 0) {
@@ -422,7 +384,7 @@ bool readCIFFFile(std::ifstream& file, std::string fileName) {
 		return false;
 	}
 	//Print CIFF data
-	std::cout << "CIFF size: " << iwidth << " x " << iheight << std::endl;
+	std::cout << "CIFF size: " << width << " x " << height << std::endl;
 	std::cout << "Caption: " << caption << std::endl;
 	std::cout << "Tags: ";
 	for (size_t i = 0; i < vtags.size(); i++) {
@@ -447,16 +409,14 @@ bool readCAFFAnimationBlock(std::ifstream& file, std::string fileName, size_t an
 	}
 
 	//Animation duration
-	char duration[8];
+	size_t duration = 0;
 
 	//Read in the duration
-	if (!file.read(duration, sizeof(duration))) {
+	if (!file.read(reinterpret_cast<char*>(&duration), sizeof(duration))) {
 		std::cerr << "Failed to read file!" << std::endl;
 		return false;
 	}
-	//Convert the duration
-	//size_t iduration = convertToNumber64(duration);
-	
+
 	//Read and verify the CIFF file and make the JPEG
 	if (!readCIFFFile(file, fileName)) {
 		std::cerr << "Failed to parse CIFF file!" << std::endl;
@@ -470,6 +430,30 @@ bool readCAFFAnimationBlock(std::ifstream& file, std::string fileName, size_t an
 //Returns with true if successful, otherwise false
 bool readCAFFFile(std::ifstream& file, std::string fileName) {
 	//Start reading CAFF file
+
+	//Read the first block header
+	std::optional<CAFFBlockHeader> firstBlockOpt = readCAFFBlockHeader(file);
+
+	//If something went wrong return with false
+	if (!firstBlockOpt.has_value()) {
+		std::cerr << "Failed to parse CAFF Block!" << std::endl;
+		return false;
+	}
+
+	//Get the value of the first block
+	CAFFBlockHeader firstBlock = firstBlockOpt.value();
+
+	//Check if the first block is a header block
+	if (firstBlock.id != CAFFBlockType::header) {
+		std::cerr << "The first block was not a header block!" << std::endl;
+		return false;
+	}
+
+	if (!readCAFFHeaderBlock(file)) {
+		std::cerr << "Failed to parse CAFF Header Block!" << std::endl;
+		return false;
+	}
+
 	//Read until we get one animation block or something goes wrong
 	bool finished = false;
 	while (!finished) {
@@ -489,10 +473,8 @@ bool readCAFFFile(std::ifstream& file, std::string fileName) {
 		//If the block is a header block read it and verify it
 		//If successfully verified continue reading else return with false
 		case CAFFBlockType::header:
-			if (!readCAFFHeaderBlock(file)) {
-				std::cerr << "Failed to parse CAFF Header Block!" << std::endl;
-				return false;
-			}
+			std::cerr << "Multiple Header Blocks in the file!" << std::endl;
+			return false;
 			break;
 		//If the block is a credits block read it and verify it
 		//If successfully verified continue reading else return with false
